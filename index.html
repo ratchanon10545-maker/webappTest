@@ -1,120 +1,155 @@
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
-<meta charset="UTF-8">
-<title>ระบบตรวจคำตอบหลายชุด</title>
-<style>
-body { font-family: Arial; padding:20px; background:#f4f6f9; }
-.question { background:white; padding:15px; margin-bottom:15px; border-radius:8px; }
-.correct { color:green; font-weight:bold; }
-.wrong { color:red; font-weight:bold; }
-button { padding:8px 15px; margin-top:10px; cursor:pointer; }
-select { padding:6px; }
-</style>
+  <meta charset="UTF-8">
+  <title>ระบบตรวจคำตอบหลายชุด</title>
+  <style>
+    body {
+      font-family: Arial;
+      padding: 20px;
+      background: #f4f6f9;
+    }
+
+    .question {
+      background: white;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+    }
+
+    .correct {
+      color: green;
+      font-weight: bold;
+    }
+
+    .wrong {
+      color: red;
+      font-weight: bold;
+    }
+
+    button {
+      padding: 8px 15px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+
+    select {
+      padding: 6px;
+    }
+  </style>
 </head>
+
 <body>
 
-<h2>เลือกชุดข้อสอบ</h2>
+  <h2>เลือกชุดข้อสอบ</h2>
 
-<select id="examSelect">
-  <option value="">-- เลือกข้อสอบ --</option>
-  <option value="set1">ชุดที่ 1 พรป.ว่าด้วยคณะกกต</option>
-  <option value="set2">ชุดที่ 2 พรป.ว่าด้วยพรรคการเมือง พ.ศ.2560</option>
-  <option value="set3">ชุดที่ 3 พรป.ว่าด้วยการเลือกตั้งสมาชิกสภาผู้แทนราษฎร พ.ศ. 2561</option>
-</select>
+  <select id="examSelect">
+    <option value="">-- เลือกข้อสอบ --</option>
+    <option value="set1">ชุดที่ 1 พรป.ว่าด้วยคณะกกต</option>
+    <option value="set2">ชุดที่ 2 พรป.ว่าด้วยพรรคการเมือง พ.ศ.2560</option>
+    <option value="set3">ชุดที่ 3 พรป.ว่าด้วยการเลือกตั้งสมาชิกสภาผู้แทนราษฎร พ.ศ. 2561</option>
+  </select>
 
-<button onclick="loadExam()">เริ่มทำข้อสอบ</button>
+  <button onclick="loadExam()">เริ่มทำข้อสอบ</button>
 
-<hr>
+  <hr>
 
-<div id="quiz"></div>
-<button onclick="checkAnswers()" id="checkBtn" style="display:none;">ตรวจคำตอบ</button>
-<h3 id="result"></h3>
+  <div id="quiz"></div>
+  <button onclick="checkAnswers()" id="checkBtn" style="display:none;">ตรวจคำตอบ</button>
+  <h3 id="result"></h3>
 
-<script>
+  <script>
 
-let answerKey = {};
+    let answerKey = {};
+    let score = 0;
+    let answered = {};
 
-async function loadExam() {
-  const exam = document.getElementById("examSelect").value;
-  if (!exam) return alert("กรุณาเลือกชุดข้อสอบ");
+    async function loadExam() {
+      const exam = document.getElementById("examSelect").value;
+      if (!exam) return alert("กรุณาเลือกชุดข้อสอบ");
 
-  document.getElementById("quiz").innerHTML = "";
-  document.getElementById("result").innerHTML = "";
+      document.getElementById("quiz").innerHTML = "";
+      document.getElementById("result").innerHTML = "";
+      score = 0;
+      answered = {};
 
-  // โหลดคำถาม
-  const qRes = await fetch(`data/${exam}.txt`);
-  const text = await qRes.text();
+      const qRes = await fetch(`data/${exam}.txt`);
+      const text = await qRes.text();
 
-  // โหลดเฉลย
-  const aRes = await fetch(`data/${exam}_answers.json`);
-  answerKey = await aRes.json();
+      const aRes = await fetch(`data/${exam}_answers.json`);
+      answerKey = await aRes.json();
 
-  const quizDiv = document.getElementById("quiz");
+      const quizDiv = document.getElementById("quiz");
+      const questionBlocks = text.split(/\n(?=\d+\.)/);
 
-  const questionBlocks = text.split(/\n(?=\d+\.)/);
+      questionBlocks.forEach(block => {
+        const lines = block.trim().split("\n");
+        if (!lines[0]) return;
 
-  questionBlocks.forEach(block => {
-    const lines = block.trim().split("\n");
-    if (!lines[0]) return;
+        const questionText = lines[0];
+        const qNumber = questionText.match(/^(\d+)/)[1];
 
-    const questionText = lines[0];
-    const qNumber = questionText.match(/^(\d+)/)[1];
+        const div = document.createElement("div");
+        div.className = "question";
 
-    const div = document.createElement("div");
-    div.className = "question";
+        let html = `<p>${questionText}</p>`;
 
-    let html = `<p>${questionText}</p>`;
+        for (let i = 1; i < lines.length; i++) {
+          const option = lines[i].trim();
+          if (!option) continue;
 
-    for (let i = 1; i < lines.length; i++) {
-      const option = lines[i].trim();
-      if (!option) continue;
+          const letter = option.charAt(0);
 
-      const letter = option.charAt(0);
-
-      html += `
+          html += `
         <label>
-          <input type="radio" name="q${qNumber}" value="${letter}">
+          <input type="radio" 
+                 name="q${qNumber}" 
+                 value="${letter}"
+                 onclick="checkSingleAnswer(${qNumber})">
           ${option}
         </label><br/>
       `;
+        }
+
+        html += `<div id="feedback${qNumber}"></div>`;
+        div.innerHTML = html;
+        quizDiv.appendChild(div);
+      });
     }
 
-    html += `<div id="feedback${qNumber}"></div>`;
-    div.innerHTML = html;
-    quizDiv.appendChild(div);
-  });
+    function checkSingleAnswer(qNumber) {
+      const selected = document.querySelector(`input[name="q${qNumber}"]:checked`);
+      const feedback = document.getElementById(`feedback${qNumber}`);
 
-  document.getElementById("checkBtn").style.display = "inline-block";
-}
+      if (!selected) return;
 
-function checkAnswers() {
-  let score = 0;
-  const total = Object.keys(answerKey).length;
+      const correct = answerKey[qNumber];
 
-  for (let q in answerKey) {
-    const selected = document.querySelector(`input[name="q${q}"]:checked`);
-    const feedback = document.getElementById(`feedback${q}`);
+      // กันการกดซ้ำเพิ่มคะแนน
+      if (!answered[qNumber]) {
+        answered[qNumber] = true;
 
-    if (!selected) {
-      feedback.innerHTML = `<span class="wrong">ยังไม่ได้เลือก</span>`;
-      continue;
+        if (selected.value === correct) {
+          score++;
+        }
+      }
+
+      if (selected.value === correct) {
+        feedback.innerHTML = `<span style="color:green;font-weight:bold;">✔ ถูกต้อง</span>`;
+      } else {
+        feedback.innerHTML =
+          `<span style="color:red;font-weight:bold;">
+        ✘ ผิด (คำตอบที่ถูกคือ ${correct})
+       </span>`;
+      }
+
+      document.getElementById("result").innerText =
+        `คะแนนปัจจุบัน: ${score} / ${Object.keys(answerKey).length}`;
     }
 
-    if (selected.value === answerKey[q]) {
-      score++;
-      feedback.innerHTML = `<span class="correct">✔ ถูกต้อง</span>`;
-    } else {
-      feedback.innerHTML =
-        `<span class="wrong">✘ ผิด (ตอบที่ถูกคือ ${answerKey[q]})</span>`;
-    }
-  }
-
-  document.getElementById("result").innerText =
-    `คะแนนที่ได้: ${score} / ${total}`;
-}
-
-</script>
+  </script>
 
 </body>
+
 </html>
